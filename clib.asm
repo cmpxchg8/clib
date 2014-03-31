@@ -31,15 +31,17 @@
 _x86_memchr:
 x86_memchr:
     pushad
+    
+    ; not implemented yet
     popad
     ret
     
 ; ************************************************************************
-; long memcmp (const void *s1, const void *s2, unsigned long len);
+; int memcmp ( const void * ptr1, const void * ptr2, size_t num );
 ;
-; < 0 if s1 is less than s2
-; = 0 if s1 is the same as s2
-; > 0 if s1 is greater than s2
+; < 0 if ptr1 is less than ptr2
+; = 0 if ptr1 is the same as ptr2
+; > 0 if ptr1 is greater than ptr2
 ; ************************************************************************
     global x86_memcmp
     global _x86_memcmp
@@ -47,9 +49,9 @@ _x86_memcmp:
 x86_memcmp:
     pushad
     xor    edx, edx
-    mov    esi, [esp+32+4]    ; s1
-    mov    edi, [esp+32+8]    ; s2
-    mov    ecx, [esp+32+12]   ; len
+    mov    esi, [esp+32+4]    ; ptr1
+    mov    edi, [esp+32+8]    ; ptr2
+    mov    ecx, [esp+32+12]   ; num
     rep    cmpsb
     setnz  dl                 ; edx = ZF==1 ? 1 : 0
     sbb    eax, eax           ; eax = (eax - eax) - (CF==1 ? 1 : 0)
@@ -90,6 +92,8 @@ x86_memcpy:
 _x86_memmove:
 x86_memmove:
     pushad
+    
+    ; not implemented yet
     popad
     ret
     
@@ -142,7 +146,8 @@ cat_loop:
     ret
 
 ; ************************************************************************
-; char *strchr (const char *str, short c);
+; const char * strchr ( const char * str, int character );
+;       char * strchr (       char * str, int character );
 ;
 ; Returns a pointer to the first occurrence of character in the C string str.
 ; The terminating null-character is considered part of the C string. 
@@ -237,41 +242,7 @@ len_loop:
     inc    eax
     cmp    byte [edx+eax], 0
     jne    len_loop
-    ret
-    
-; ************************************************************************
-; int stricmp( const char *str1, const char *str2 );
-;
-; Compares regardless of case the C string str1 to the C string str2.
-;
-; < 0 if str1 is less than str2
-; = 0 if str1 is the same as str2
-; > 0 if str1 is greater than str2
-; ************************************************************************
-    global x86_stricmp
-    global _x86_stricmp
-_x86_stricmp:
-x86_stricmp:
-    pushad
-    mov    esi, [esp+32+4]   ; s1
-    mov    edi, [esp+32+8]   ; s2
-icmp_loop:
-    lodsb
-    mov    bl, [edi]
-    inc    edi
-    test   bl, bl
-    jz     exit_icmp
-    or     al, 32         ; convert to lowercase
-    or     bl, 32
-    cmp    al, bl
-    je     icmp_loop
-    sbb    eax, eax
-    sbb    eax, -1
-exit_icmp:
-    mov    [esp+28], eax
-    popad
-    ret
-    
+    ret    
     
 ; ************************************************************************
 ; char *strrchr (const char *str, short c);
@@ -329,6 +300,37 @@ exit_strstr:
     mov    [esp+28], eax
     popad
     ret
-    
-    
+   
+; ************************************************************************
+; int stricmp( const char *str1, const char *str2 );
+;
+; Compares regardless of case the C string str1 to the C string str2.
+;
+; < 0 if str1 is less than str2
+; = 0 if str1 is the same as str2
+; > 0 if str1 is greater than str2
+; ************************************************************************
+    global x86_stricmp
+    global _x86_stricmp
+_x86_stricmp:
+x86_stricmp:
+    pushad
+    mov    esi, [esp+32+4]   ; s1
+    mov    edi, [esp+32+8]   ; s2
+icmp_loop:
+    lodsb
+    mov    bl, [edi]
+    inc    edi
+    test   bl, bl
+    jz     exit_icmp
+    or     al, 32         ; convert to lowercase
+    or     bl, 32
+    cmp    al, bl
+    je     icmp_loop
+    sbb    eax, eax
+    sbb    eax, -1
+exit_icmp:
+    mov    [esp+28], eax
+    popad
+    ret
     
