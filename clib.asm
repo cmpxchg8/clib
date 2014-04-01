@@ -1,21 +1,14 @@
 
+; ========================================================
+; some simple C string functions which might be useful 
+; to those wishing to understand how it's done in x86 asm.
 ;
-; C string functions in x86 assembly which might be useful as reference
+;  these are written with size in mind, not speed.
 ;
-
+; Kevin Devine
+; ========================================================
     [bits 32]
     [section .text]
-    
-  struc PUSHAD_STRUCT
-    _edi  dd  ?
-    _esi  dd  ?
-    _ebp  dd  ?
-    _esp  dd  ?
-    _ebx  dd  ?
-    _edx  dd  ?
-    _ecx  dd  ?
-    _eax  dd  ?
-  endstruc
   
 ; ************************************************************************ 
 ;const void * memchr ( const void * ptr, int value, size_t num );
@@ -30,9 +23,16 @@
     
 _x86_memchr:
 x86_memchr:
+    xor    eax, eax
     pushad
-    
-    ; not implemented yet
+    mov    edi, [esp+32+4]    ; ptr
+    mov    eax, [esp+32+8]    ; value
+    mov    ecx, [esp+32+12]   ; num
+    repnz  scasb
+    jecxz  exit_memchr
+    dec    edi
+    mov    [esp+28], edi
+exit_memchr:
     popad
     ret
     
@@ -91,9 +91,12 @@ x86_memcpy:
     
 _x86_memmove:
 x86_memmove:
+    mov    eax, [esp+4]
     pushad
-    
-    ; not implemented yet
+    xchg   eax, edi
+    mov    esi, [esp+32+8]
+    mov    ecx, [esp+32+12]
+    rep    movsb
     popad
     ret
     
@@ -203,7 +206,7 @@ exit_cmp:
     xor    eax, edx
     mov    [esp+28], eax
     popad
-    ret   
+    ret
     
 ; ************************************************************************
 ; char * strcpy ( char * destination, const char * source );
@@ -242,7 +245,47 @@ len_loop:
     inc    eax
     cmp    byte [edx+eax], 0
     jne    len_loop
-    ret    
+    test   eax, eax
+    ret
+    
+; ************************************************************************
+; const char * strpbrk ( const char * str1, const char * str2 );
+;       char * strpbrk (       char * str1, const char * str2 );
+;
+; Returns a pointer to the first occurrence in str1 of any of the 
+; characters that are part of str2, or a null pointer if there are no matches.
+; ************************************************************************
+    global x86_strpbrk
+    global _x86_strpbrk
+_x86_strpbrk:
+x86_strpbrk:
+    xor    eax, eax
+    pushad
+    or     ebx, -1         ; ptr to string if we find occurrence
+    mov    esi, [esp+32+8]  ; str2
+load_byte:
+    mov    edi, [esp+32+4]  ; str1
+    movzx  ecx, byte[esi]
+    jecxz  exit_pbrk        ; scanned all
+    inc    esi
+find_byte:
+    cmp    byte[edi], cl    ; found byte?
+    jz     save_pos         ; we found occurrence, save position
+    
+    inc    edi
+    
+    cmp    byte[edi], al    ; end of string?
+    jnz    find_byte
+    
+    jmp    load_byte        ; load another
+save_pos:
+    cmp    edi, ebx
+    cmovb  ebx, edi
+    mov    [esp+28], ebx
+    jmp    load_byte
+exit_pbrk:
+    popad
+    ret
     
 ; ************************************************************************
 ; char *strrchr (const char *str, short c);
@@ -274,7 +317,7 @@ exit_strrchr:
     mov    [esp+28], eax
     popad
     ret
-
+  
 ; ************************************************************************
 ; const char * strstr ( const char * str1, const char * str2 );
 ;       char * strstr (       char * str1, const char * str2 );
@@ -289,15 +332,36 @@ exit_strrchr:
     
 _x86_strstr:
 x86_strstr:
-    mov    eax, [esp+4]        ; str1
+    xor    eax, eax
     pushad
-    xchg   eax, esi
-    mov    edi, [esp+32+8]     ; str2
-    mov    edx, esi
+    mov    edi, [esp+32+4]     ; str1
+    mov    esi, [esp+32+8]     ; str2
     
-    ; not implemented yet
+    push   esi
+    call   x86_strlen
+    pop    esi
+    jz     save_ptr            ; nothing to find?
+    
+    xchg   eax, ecx            ; ecx = strlen (str2)
+    
+    push   edi
+    call   x86_strlen          ; eax = strlen (str1)
+    pop    edi
+    jz     exit_strstr         ; nothing to search?
+find_substr:
+    cmp    ecx, eax            ; if (s2_len > s1_len) goto exit_strstr;
+    ja     exit_strstr
+    
+    pushad
+    rep    cmpsb               ; strncmp (esi, edi, ecx)
+    popad
+    je     save_ptr
+    inc    edi                 ; s1_ptr++;
+    dec    eax                 ; s1_len--; 
+    jmp    find_substr
+save_ptr:
+    mov    [esp+28], edi
 exit_strstr:
-    mov    [esp+28], eax
     popad
     ret
    
@@ -319,13 +383,12 @@ x86_stricmp:
     mov    edi, [esp+32+8]   ; s2
 icmp_loop:
     lodsb
-    mov    bl, [edi]
+    movzx  ecx, byte[edi]
     inc    edi
-    test   bl, bl
-    jz     exit_icmp
+    jecxz  exit_icmp
     or     al, 32         ; convert to lowercase
     or     bl, 32
-    cmp    al, bl
+    cmp    al, cl
     je     icmp_loop
     sbb    eax, eax
     sbb    eax, -1
