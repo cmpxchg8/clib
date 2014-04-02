@@ -1,9 +1,9 @@
 
 ; ========================================================
-; some simple C string functions which might be useful 
-; to those wishing to understand how it's done in x86 asm.
+; Some simple C string functions which might be useful 
+; to those wishing to understand how they work in x86 asm.
 ;
-;  these are written with size in mind, not speed.
+; These are written with size in mind, not speed.
 ;
 ; Kevin Devine
 ; ========================================================
@@ -11,8 +11,8 @@
     [section .text]
   
 ; ************************************************************************ 
-;const void * memchr ( const void * ptr, int value, size_t num );
-;      void * memchr (       void * ptr, int value, size_t num );
+; const void * memchr ( const void * ptr, int value, size_t num );
+;       void * memchr (       void * ptr, int value, size_t num );
 ;
 ; Searches within the first num bytes of the block of memory pointed by 
 ; ptr for the first occurrence of ; value (interpreted as an unsigned char), 
@@ -135,6 +135,7 @@ x86_strcat:
     pushad
     xchg   eax, edi
     mov    esi, [esp+32+8]   ; source
+    or     ecx, -1
     xor    eax, eax          ; eax = 0
 find_end:
     scasb                    ; cmp byte ptr[edi], al
@@ -261,15 +262,15 @@ _x86_strpbrk:
 x86_strpbrk:
     xor    eax, eax
     pushad
-    or     ebx, -1         ; ptr to string if we find occurrence
+    or     ebx, -1          ; ptr to string if we find occurrence
     mov    esi, [esp+32+8]  ; str2
 load_byte:
     mov    edi, [esp+32+4]  ; str1
-    movzx  ecx, byte[esi]
-    jecxz  exit_pbrk        ; scanned all
-    inc    esi
+    lodsb
+    or     al, al
+    jz     exit_pbrk
 find_byte:
-    cmp    byte[edi], cl    ; found byte?
+    cmp    byte[edi], al    ; found byte?
     jz     save_pos         ; we found occurrence, save position
     
     inc    edi
@@ -386,8 +387,8 @@ icmp_loop:
     movzx  ecx, byte[edi]
     inc    edi
     jecxz  exit_icmp
-    or     al, 32         ; convert to lowercase
-    or     bl, 32
+    or     al, 32            ; convert to lowercase
+    or     cl, 32
     cmp    al, cl
     je     icmp_loop
     sbb    eax, eax
